@@ -16,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/chunloy/tinyapp/issues"
   },
-  "homepage": "https://github.com/chunloy/tinyapp#readme"
+  "homepage": "https://github.com/chunloy/tinyapp#readme",
+  "dependencies": {
+    "express": "^4.17.3"
+  }
 }
