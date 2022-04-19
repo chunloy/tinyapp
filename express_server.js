@@ -28,44 +28,54 @@ const generateRandomString = function() {
 };
 
 
-//new url page
+//new url GET page
 app.get("/urls/new", (req, res) => {
   res.render("urls_new");
 });
 
-//show shortened url
+//show shortened GET url
 app.get('/urls/:shortURL', (req, res) => {
   const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
   res.render("urls_show", templateVars);
 });
 
-//urls.json page
+//shortened url redirect GET page
+app.get("/u/:shortURL", (req, res) => {
+  const shortenedURL = req.params.shortURL;
+  const longURL = urlDatabase[shortenedURL];
+  res.redirect(longURL);
+});
+
+//urls.json GET page
 app.get("/urls.json", (req, res) => {
   res.json(urlDatabase);
 });
 
-//urls page
+//urls form POST page
 app.post('/urls', (req, res) => {
-  console.log((req.body));
-  res.send("OK");
+  const shortenedURL = generateRandomString();
+  const httpScheme = 'http://';
+  let longURL = req.body.longURL;
+
+  //preprend http:// if not included
+  if (!longURL.includes(httpScheme)) {
+    longURL = httpScheme + longURL;
+  }
+  urlDatabase[shortenedURL] = longURL; //add url pair to database
+  res.redirect(`/urls/${shortenedURL}`);
 });
 
-//urls page
+//urls GET page
 app.get('/urls', (req, res) => {
   const templateVars = { urls: urlDatabase }; //need to send variables as objects to EJS template
   res.render("urls_index", templateVars);
 });
 
-//hello page... not needed?
-app.get("/hello", (request, response) => {
-  response.send("<html><body>Hello <b>World</b></body></html>");
-});
 
-//index page
+//index GET page
 app.get('/', (req, res) => {
   res.send("Hello");
 });
-
 
 //leave listener at the bottom by convention
 app.listen(PORT, () => {
