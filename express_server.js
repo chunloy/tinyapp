@@ -27,6 +27,12 @@ const generateRandomString = function() {
   return randomString;
 };
 
+//show shortened POST url
+app.post('/urls/:shortURL/delete', (req, res) => {
+  const shortenedURL = req.params.shortURL;
+  delete urlDatabase[shortenedURL];
+  res.redirect('/urls');
+});
 
 //new url GET page
 app.get("/urls/new", (req, res) => {
