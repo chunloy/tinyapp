@@ -10,12 +10,17 @@ const urlDatabase = {
   "9sm5xK": "http://www.google.com"
 };
 
-app.get('/', (request, response) => {
-  response.send("Hello");
+app.get('/', (req, res) => {
+  res.send("Hello");
 });
 
-app.get("/urls.json", (request, response) => {
-  response.json(urlDatabase);
+app.get('/urls', (req, res) => {
+  const templateVars = { urls: urlDatabase }; //need to send variables as objects to EJS template
+  res.render("urls_index", templateVars);
+});
+
+app.get("/urls.json", (req, res) => {
+  res.json(urlDatabase);
 });
 
 app.get("/hello", (request, response) => {
