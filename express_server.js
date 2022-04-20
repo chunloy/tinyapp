@@ -1,13 +1,15 @@
 const express = require('express');
 const bodyParser = require("body-parser");
+const cookieParser = require("cookie-parser");
 const app = express();
 const PORT = 8080; //default port 8080
 
 //use ejs as templating engine
 app.set("view engine", "ejs");
 
-//use body parse middleware
+//use body & cookie parser middlewares
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 const urlDatabase = {
   "b2xVn2": "http://www.lighthouselabs.ca",
@@ -36,7 +38,7 @@ app.get('/', (req, res) => {
 
 //GET urls page
 app.get('/urls', (req, res) => {
-  const templateVars = { urls: urlDatabase }; //need to send variables as objects to EJS template
+  const templateVars = { urls: urlDatabase, username: req.cookies["username"] }; //need to send variables as objects to EJS template
   res.render("urls_index", templateVars);
 });
 
@@ -47,7 +49,8 @@ app.get("/urls.json", (req, res) => {
 
 //GET new urls page
 app.get("/urls/new", (req, res) => {
-  res.render("urls_new");
+  const templateVars = { username: req.cookies["username"] };
+  res.render("urls_new", templateVars);
 });
 
 //shortened url redirect GET page
@@ -59,12 +62,28 @@ app.get("/u/:shortURL", (req, res) => {
 
 //GET show shortened url page
 app.get('/urls/:shortURL', (req, res) => {
-  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
+  const templateVars = {
+    shortURL: req.params.shortURL,
+    longURL: urlDatabase[req.params.shortURL],
+    username: req.cookies["username"]
+  };
   res.render("urls_show", templateVars);
 });
 
-
 //-------------------- POST REQUESTS --------------------
+
+//POST login page
+app.post('/login', (req, res) => {
+  const username = req.body.username;
+  res.cookie('username', username);
+  res.redirect('/urls');
+});
+
+//POST logout page
+app.post('/logout', (req, res) => {
+  res.clearCookie('username');
+  res.redirect('/urls');
+});
 
 //add new url to database & allow redirect to long URL
 app.post('/urls', (req, res) => {
