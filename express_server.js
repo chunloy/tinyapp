@@ -46,21 +46,45 @@ const generateRandomString = function() {
   return randomString;
 };
 
-//HELPER: returns user from database as an object
-const findUser = function(userID) {
-  //get keys from user database
-  const userKeys = Object.keys(users);
+//HELPER: returns user object if found in database
+const findUserByID = function(userID) {
+  //get user IDs from database
+  const userIDs = Object.keys(users);
 
   //search for user from cookie
-  for (const user of userKeys) {
-    if (userID === user) return users[userID];
+  for (const ID of userIDs) {
+    if (userID === ID) return users[userID];
   }
 
   //return undefined if user not found
   return undefined;
 };
 
+//HELPER: searches for existing email and returns corresponding ID
+const getUserByEmail = function(email) {
+  //get user IDs from database
+  const userIDs = Object.keys(users);
 
+  //search for user from cookie
+  for (const ID of userIDs) {
+    if (email === users[ID].email) return ID;
+  }
+
+  //return undefined if user not found
+  return undefined;
+};
+
+//HELPER: checks if email exists in users database
+const checkUserEmail = function(email) {
+  //get user IDs from database
+  const userIDs = Object.keys(users);
+
+  //check if email is in database
+  for (const ID of userIDs) {
+    if (email === users[ID].email) return true;
+  }
+  return false;
+};
 
 //-------------------- GET REQUESTS --------------------
 
@@ -71,13 +95,21 @@ app.get('/', (req, res) => {
 
 //GET register page
 app.get('/register', (req, res) => {
-  res.render("urls_register");
+  res.render("urls_register", { user: undefined });
+});
+
+//GET login page
+app.get('/login', (req, res) => {
+  const user = req.cookies.user_id;
+  const templateVars = { user };
+  res.render("urls_login", templateVars);
 });
 
 //GET urls page
 app.get('/urls', (req, res) => {
-  const user = findUser(req.cookies.user_id);
-  const templateVars = { urls: urlDatabase, user }; //need to send variables as objects to EJS template
+  const user = findUserByID(req.cookies.user_id);
+  //need to send variables as objects to EJS template
+  const templateVars = { urls: urlDatabase, user };
   res.render("urls_index", templateVars);
 });
 
@@ -88,7 +120,7 @@ app.get("/urls.json", (req, res) => {
 
 //GET new urls page
 app.get("/urls/new", (req, res) => {
-  const user = findUser(req.cookies.user_id);
+  const user = findUserByID(req.cookies.user_id);
   const templateVars = { user };
   res.render("urls_new", templateVars);
 });
@@ -102,7 +134,7 @@ app.get("/u/:shortURL", (req, res) => {
 
 //GET show shortened url page
 app.get('/urls/:shortURL', (req, res) => {
-  const user = findUser(req.cookies.user_id);
+  const user = findUserByID(req.cookies.user_id);
   const templateVars = {
     shortURL: req.params.shortURL,
     longURL: urlDatabase[req.params.shortURL],
@@ -118,6 +150,12 @@ app.post('/register', (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
 
+  //send 400 status if email/password are empty
+  if (!email || !password) return res.status(400).send('Not a valid email or password');
+
+  //send 400 status if email exists in users database
+  if (checkUserEmail(email)) return res.status(400).send('Email already exists! Please login instead.');
+
   //generate user id and store credentials
   const id = generateRandomString();
 
@@ -132,17 +170,27 @@ app.post('/register', (req, res) => {
 
 //POST login page
 app.post('/login', (req, res) => {
-  const username = req.body.username;
+  const email = req.body.email;
+  const password = req.body.password;
+
+  //send 400 status if email/password are empty
+  if (!email || !password) return res.status(400).send('Not a valid email or password');
+
+  //send 400 status if email doesn't exist in users database
+  if (!checkUserEmail(email)) return res.status(400).send('Email doesn\'t exists! Please register instead.');
+
+  //find user id in users database
+  const id = getUserByEmail(email);
 
   //set cookie for username
-  res.cookie('username', username);
+  res.cookie('user_id', id);
   res.redirect('/urls');
 });
 
 //POST logout page
 app.post('/logout', (req, res) => {
-  res.clearCookie('username');
-  res.redirect('/urls');
+  res.clearCookie('user_id');
+  res.redirect('/login');
 });
 
 //add new url to database & allow redirect to long URL
