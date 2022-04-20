@@ -27,60 +27,66 @@ const generateRandomString = function() {
   return randomString;
 };
 
-//show shortened POST url
-app.post('/urls/:shortURL/delete', (req, res) => {
-  const shortenedURL = req.params.shortURL;
-  delete urlDatabase[shortenedURL];
-  res.redirect('/urls');
+//-------------------- GET REQUESTS --------------------
+
+//GET index page
+app.get('/', (req, res) => {
+  res.send("Hello");
 });
 
-//new url GET page
-app.get("/urls/new", (req, res) => {
-  res.render("urls_new");
-});
-
-//show shortened GET url
-app.get('/urls/:shortURL', (req, res) => {
-  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
-  res.render("urls_show", templateVars);
-});
-
-//shortened url redirect GET page
-app.get("/u/:shortURL", (req, res) => {
-  const shortenedURL = req.params.shortURL;
-  const longURL = urlDatabase[shortenedURL];
-  res.redirect(longURL);
-});
-
-//urls.json GET page
-app.get("/urls.json", (req, res) => {
-  res.json(urlDatabase);
-});
-
-//urls form POST page
-app.post('/urls', (req, res) => {
-  const shortenedURL = generateRandomString();
-  const httpScheme = 'http://';
-  let longURL = req.body.longURL;
-
-  //preprend http:// if not included
-  if (!longURL.includes(httpScheme)) {
-    longURL = httpScheme + longURL;
-  }
-  urlDatabase[shortenedURL] = longURL; //add url pair to database
-  res.redirect(`/urls/${shortenedURL}`);
-});
-
-//urls GET page
+//GET urls page
 app.get('/urls', (req, res) => {
   const templateVars = { urls: urlDatabase }; //need to send variables as objects to EJS template
   res.render("urls_index", templateVars);
 });
 
+//GET urls.json page
+app.get("/urls.json", (req, res) => {
+  res.json(urlDatabase);
+});
 
-//index GET page
-app.get('/', (req, res) => {
-  res.send("Hello");
+//GET new urls page
+app.get("/urls/new", (req, res) => {
+  res.render("urls_new");
+});
+
+//shortened url redirect GET page
+app.get("/u/:shortURL", (req, res) => {
+  const shortURL = req.params.shortURL;
+  const longURL = urlDatabase[shortURL];
+  res.redirect(longURL);
+});
+
+//GET show shortened url page
+app.get('/urls/:shortURL', (req, res) => {
+  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
+  res.render("urls_show", templateVars);
+});
+
+
+//-------------------- POST REQUESTS --------------------
+
+//add new url to database & allow redirect to long URL
+app.post('/urls', (req, res) => {
+  const shortURL = generateRandomString();
+  let longURL = req.body.longURL;
+  urlDatabase[shortURL] = longURL; //add url pair to database
+  res.redirect(`/urls/${shortURL}`);
+});
+
+//update long URL
+app.post('/urls/:shortURL', (req, res) => {
+  const shortURL = req.params.shortURL;
+  const longURL = req.body.longURL;
+  urlDatabase[shortURL] = longURL;
+  res.redirect('/urls');
+});
+
+//Delete url using POST
+app.post('/urls/:shortURL/delete', (req, res) => {
+  const shortURL = req.params.shortURL;
+  delete urlDatabase[shortURL];
+  res.redirect('/urls');
 });
 
 //leave listener at the bottom by convention
