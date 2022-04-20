@@ -36,6 +36,11 @@ app.get('/', (req, res) => {
   res.send("Hello");
 });
 
+app.get('/register', (req, res) => {
+
+  res.render("urls_register");
+});
+
 //GET urls page
 app.get('/urls', (req, res) => {
   const templateVars = { urls: urlDatabase, username: req.cookies["username"] }; //need to send variables as objects to EJS template
