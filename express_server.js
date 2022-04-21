@@ -86,12 +86,12 @@ const checkUserEmail = function(email) {
   return false;
 };
 
-//-------------------- GET REQUESTS --------------------
+//HELPER: checks user's password in users database
+const checkUserPassword = function(userID, password) {
+  return users[userID].password === password;
+};
 
-//GET index page
-app.get('/', (req, res) => {
-  res.send("Hello");
-});
+//-------------------- GET REQUESTS --------------------
 
 //GET register page
 app.get('/register', (req, res) => {
@@ -151,7 +151,7 @@ app.post('/register', (req, res) => {
   const password = req.body.password;
 
   //send 400 status if email/password are empty
-  if (!email || !password) return res.status(400).send('Not a valid email or password');
+  if (!email || !password) return res.status(400).send('Credentials cannot be empty!');
 
   //send 400 status if email exists in users database
   if (checkUserEmail(email)) return res.status(400).send('Email already exists! Please login instead.');
@@ -174,15 +174,18 @@ app.post('/login', (req, res) => {
   const password = req.body.password;
 
   //send 400 status if email/password are empty
-  if (!email || !password) return res.status(400).send('Not a valid email or password');
+  if (!email || !password) return res.status(400).send('Credentials cannot be empty!');
 
-  //send 400 status if email doesn't exist in users database
-  if (!checkUserEmail(email)) return res.status(400).send('Email doesn\'t exists! Please register instead.');
+  //send 403 status if email doesn't exist in users database
+  if (!checkUserEmail(email)) return res.status(403).send('Email doesn\'t exists! Please register instead.');
+
+  //send 403 status if password doesn't match
+  if (!checkUserPassword(getUserByEmail(email), password)) return res.status(403).send('Wrong password!');
 
   //find user id in users database
   const id = getUserByEmail(email);
 
-  //set cookie for username
+  //set cookie for user id
   res.cookie('user_id', id);
   res.redirect('/urls');
 });
