@@ -145,7 +145,7 @@ app.post('/login', (req, res) => {
   if (!checkUserEmail(email, users)) return res.status(403).send('Email doesn\'t exists! Please register instead.');
 
   //send 403 status if hashed password doesn't match
-  if (!bcrypt.compareSync(password, getPasswordByEmail(email, urlDatabase))) {
+  if (!bcrypt.compareSync(password, getPasswordByEmail(email, users))) {
     return res.status(403).send('Wrong password! Try again.');
   }
 
