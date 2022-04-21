@@ -1,13 +1,12 @@
 const express = require('express');
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
+const bcrypt = require('bcryptjs');
+
 const app = express();
-const PORT = 8080; //default port 8080
+const PORT = 8080;
 
-//use ejs as templating engine
 app.set("view engine", "ejs");
-
-//use body & cookie parser middlewares
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -28,12 +27,12 @@ const users = {
   "userRandomID": {
     id: "userRandomID",
     email: "user@example.com",
-    password: "purple-monkey-dinosaur"
+    password: "$2a$10$QlG/Qqq/wSrwG0yEFNkTCeGNvNYYYAJWnVuffO7nIs4rPve9ZRlHm" //purple-monkey-dinosaur
   },
   "user2RandomID": {
     id: "user2RandomID",
     email: "user2@example.com",
-    password: "dishwasher-funk"
+    password: "$2a$10$cuGIYm1RMSfY5YvYNbzuf.CaK3CQoL6GjLB8/k2IwBEdG8iMsbyYy" //dishwasher-funk
   }
 };
 
@@ -52,7 +51,7 @@ const generateRandomString = function() {
   return randomString;
 };
 
-//HELPER: returns user object if found in database
+//returns user object if found in database
 const findUserByID = function(userID) {
   //get user IDs from database
   const userIDs = Object.keys(users);
@@ -66,7 +65,7 @@ const findUserByID = function(userID) {
   return undefined;
 };
 
-//HELPER: searches for existing email and returns corresponding ID
+//searches for existing email and returns corresponding ID
 const getUserByEmail = function(email) {
   //get user IDs from database
   const userIDs = Object.keys(users);
@@ -80,7 +79,7 @@ const getUserByEmail = function(email) {
   return undefined;
 };
 
-//HELPER: checks if email exists in users database
+//checks if email exists in users database
 const checkUserEmail = function(email) {
   //get user IDs from database
   const userIDs = Object.keys(users);
@@ -92,9 +91,16 @@ const checkUserEmail = function(email) {
   return false;
 };
 
-//HELPER: checks user's password in users database
-const checkUserPassword = function(userID, password) {
-  return users[userID].password === password;
+//returns user's hashed password by email if found
+const getPasswordByEmail = function(email) {
+  const userIDs = Object.keys(users);
+
+  for (const ID of userIDs) {
+    if (email === users[ID].email) {
+      return users[ID].password;
+    }
+  }
+  return "noPasswordFound";
 };
 
 //filter url database by user ID
@@ -125,7 +131,7 @@ app.get('/login', (req, res) => {
   res.render("urls_login", templateVars);
 });
 
-//GET urls page
+//GET urls (main page)
 app.get('/urls', (req, res) => {
   //send 401 status if user is not logged in
   if (!req.cookies.user_id) return res.status(401).send('You must be logged in to view this page.');
@@ -137,7 +143,7 @@ app.get('/urls', (req, res) => {
   res.render("urls_index", templateVars);
 });
 
-//GET urls.json page
+//GET urls.json
 app.get("/urls.json", (req, res) => {
   res.json(urlDatabase);
 });
@@ -153,7 +159,7 @@ app.get("/urls/new", (req, res) => {
   res.render("urls_new", templateVars);
 });
 
-//GET EDIT PAGE show shortened url page
+//GET EDIT long url page
 app.get('/urls/:shortURL', (req, res) => {
   //send 401 status if not logged in
   if (!req.cookies.user_id) return res.status(401).send('You must be logged in to view this page.');
@@ -169,7 +175,7 @@ app.get('/urls/:shortURL', (req, res) => {
   res.render("urls_show", templateVars);
 });
 
-//shortened url redirect GET page
+//GET long url from short url (public)
 app.get("/u/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
   const longURL = urlDatabase[shortURL].longURL;
@@ -180,7 +186,7 @@ app.get("/u/:shortURL", (req, res) => {
 
 //-------------------- POST REQUESTS --------------------
 
-//POST register page
+//REGISTER POST
 app.post('/register', (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
@@ -193,17 +199,17 @@ app.post('/register', (req, res) => {
 
   //generate user id and store credentials
   const id = generateRandomString();
+  const hashedPassword = bcrypt.hashSync(password, 10);
 
   //add user to database
-  users[id] = { id, email, password };
+  users[id] = { id, email, password: hashedPassword };
 
   //store cookie for new user
   res.cookie('user_id', id);
-
   res.redirect('/urls');
 });
 
-//POST login page
+//LOGIN POST
 app.post('/login', (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
@@ -214,8 +220,10 @@ app.post('/login', (req, res) => {
   //send 403 status if email doesn't exist in users database
   if (!checkUserEmail(email)) return res.status(403).send('Email doesn\'t exists! Please register instead.');
 
-  //send 403 status if password doesn't match
-  if (!checkUserPassword(getUserByEmail(email), password)) return res.status(403).send('Wrong password! Try again.');
+  //send 403 status if hashed password doesn't match
+  if (!bcrypt.compareSync(password, getPasswordByEmail(email))) {
+    return res.status(403).send('Wrong password! Try again.');
+  }
 
   //find user id in users database
   const id = getUserByEmail(email);
@@ -225,13 +233,13 @@ app.post('/login', (req, res) => {
   res.redirect('/urls');
 });
 
-//POST logout page
+//LOGOUT POST
 app.post('/logout', (req, res) => {
   res.clearCookie('user_id');
   res.redirect('/login');
 });
 
-//add new url to database & allow redirect to long URL
+//ADD POST new urls & redirect
 app.post('/urls', (req, res) => {
 
   //Don't allow create new URL through curl
@@ -246,7 +254,7 @@ app.post('/urls', (req, res) => {
   res.redirect(`/urls/${shortURL}`); //add url pair to database
 });
 
-//edit long URL POST
+//EDIT POST long URL
 app.post('/urls/:shortURL', (req, res) => {
   //Don't allow editing through curl
   //curl - X POST - i - d "longURL=http://google.ca/" localhost: 8080/urls/b6UTxQ
@@ -259,8 +267,7 @@ app.post('/urls/:shortURL', (req, res) => {
   res.redirect('/urls');
 });
 
-//Delete url using POST
-
+//DELETE POST urlS
 app.post('/urls/:shortURL/delete', (req, res) => {
   //don't allow delete url through curl
   //curl -X POST -i localhost:8080/urls/sgq3y6/delete
