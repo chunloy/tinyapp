@@ -1,3 +1,5 @@
+/* eslint-disable camelcase */
+const { generateRandomString, findUserByID, getUserByEmail, checkUserEmail, getPasswordByEmail, urlsForUser } = require('./helpers');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieSession = require('cookie-session');
@@ -39,86 +41,6 @@ const users = {
   }
 };
 
-//-------------------- FUNCTION DEFS. --------------------
-
-//generates a random 6 character string
-const generateRandomString = function() {
-  const alphaNumericList = 'ABCDEFGHIJKLMNOPQRSTUVXWYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const stringLength = 6;
-  let randomString = "";
-
-  for (let i = 0; i < stringLength; i++) {
-    const randomIndex = Math.floor(Math.random() * alphaNumericList.length);
-    randomString += alphaNumericList[randomIndex];
-  }
-  return randomString;
-};
-
-//returns user object if found in database
-const findUserByID = function(userID) {
-  //get user IDs from database
-  const userIDs = Object.keys(users);
-
-  //search for user from cookie
-  for (const ID of userIDs) {
-    if (userID === ID) return users[userID];
-  }
-
-  //return undefined if user not found
-  return undefined;
-};
-
-//searches for existing email and returns corresponding ID
-const getUserByEmail = function(email) {
-  //get user IDs from database
-  const userIDs = Object.keys(users);
-
-  //search for user from cookie
-  for (const ID of userIDs) {
-    if (email === users[ID].email) return ID;
-  }
-
-  //return undefined if user not found
-  return undefined;
-};
-
-//checks if email exists in users database
-const checkUserEmail = function(email) {
-  //get user IDs from database
-  const userIDs = Object.keys(users);
-
-  //check if email is in database
-  for (const ID of userIDs) {
-    if (email === users[ID].email) return true;
-  }
-  return false;
-};
-
-//returns user's hashed password by email if found
-const getPasswordByEmail = function(email) {
-  const userIDs = Object.keys(users);
-
-  for (const ID of userIDs) {
-    if (email === users[ID].email) {
-      return users[ID].password;
-    }
-  }
-  return "noPasswordFound";
-};
-
-//filter url database by user ID
-const urlsForUser = function(userID) {
-  const shortURLs = Object.keys(urlDatabase);
-  const filteredList = {};
-
-  for (const url of shortURLs) {
-    if (userID === urlDatabase[url].userID) {
-      filteredList[url] = urlDatabase[url].longURL;
-    }
-  }
-  return filteredList;
-};
-
 //-------------------- GET REQUESTS --------------------
 
 //GET register page
@@ -139,8 +61,8 @@ app.get('/urls', (req, res) => {
   //send 401 status if user is not logged in
   if (!req.session.user_id) return res.status(401).send('You must be logged in to view this page.');
 
-  const user = findUserByID(req.session.user_id);
-  const filteredList = urlsForUser(user.id);
+  const user = findUserByID(req.session.user_id, users);
+  const filteredList = urlsForUser(user.id, urlDatabase);
   const templateVars = { urls: filteredList, user };
 
   res.render("urls_index", templateVars);
@@ -156,7 +78,7 @@ app.get("/urls/new", (req, res) => {
   //redirect user if not logged in
   if (!req.session.user_id) return res.redirect(`/login`);
 
-  const user = findUserByID(req.session.user_id);
+  const user = findUserByID(req.session.user_id, users);
   const templateVars = { user };
 
   res.render("urls_new", templateVars);
@@ -170,7 +92,7 @@ app.get('/urls/:shortURL', (req, res) => {
   //send 401 status if not rightful owner
   if (urlDatabase[req.params.shortURL].userID !== req.session.user_id) return res.status(401).send('This URL does not belong to you.');
 
-  const user = findUserByID(req.session.user_id);
+  const user = findUserByID(req.session.user_id, users);
   const shortURL = req.params.shortURL;
   const longURL = urlDatabase[shortURL].longURL;
   const templateVars = { longURL, shortURL, user };
@@ -186,7 +108,6 @@ app.get("/u/:shortURL", (req, res) => {
   res.redirect(longURL);
 });
 
-
 //-------------------- POST REQUESTS --------------------
 
 //REGISTER POST
@@ -198,7 +119,7 @@ app.post('/register', (req, res) => {
   if (!email || !password) return res.status(400).send('Login credentials cannot be empty! Try again.');
 
   //send 400 status if email exists in users database
-  if (checkUserEmail(email)) return res.status(400).send('This email already exists! Please login instead.');
+  if (checkUserEmail(email, users)) return res.status(400).send('This email already exists! Please login instead.');
 
   //generate user id and store credentials
   const id = generateRandomString();
@@ -221,15 +142,15 @@ app.post('/login', (req, res) => {
   if (!email || !password) return res.status(400).send('Login credentials cannot be empty! Try again');
 
   //send 403 status if email doesn't exist in users database
-  if (!checkUserEmail(email)) return res.status(403).send('Email doesn\'t exists! Please register instead.');
+  if (!checkUserEmail(email, users)) return res.status(403).send('Email doesn\'t exists! Please register instead.');
 
   //send 403 status if hashed password doesn't match
-  if (!bcrypt.compareSync(password, getPasswordByEmail(email))) {
+  if (!bcrypt.compareSync(password, getPasswordByEmail(email, urlDatabase))) {
     return res.status(403).send('Wrong password! Try again.');
   }
 
   //find user id in users database
-  const id = getUserByEmail(email);
+  const id = getUserByEmail(email, users);
 
   //set cookie for user id
   req.session.user_id = id;
