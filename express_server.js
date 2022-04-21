@@ -1,6 +1,6 @@
 const express = require('express');
-const bodyParser = require("body-parser");
-const cookieParser = require("cookie-parser");
+const bodyParser = require('body-parser');
+const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
 
 const app = express();
@@ -8,7 +8,10 @@ const PORT = 8080;
 
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(cookieParser());
+app.use(cookieSession({
+  name: 'session',
+  keys: ['thisistopsecretdonotshare']
+}));
 
 //-------------------- GLOBAL OBJS --------------------
 
@@ -125,7 +128,7 @@ app.get('/register', (req, res) => {
 
 //GET login page
 app.get('/login', (req, res) => {
-  const user = req.cookies.user_id;
+  const user = req.session.user_id;
   const templateVars = { user };
 
   res.render("urls_login", templateVars);
@@ -134,9 +137,9 @@ app.get('/login', (req, res) => {
 //GET urls (main page)
 app.get('/urls', (req, res) => {
   //send 401 status if user is not logged in
-  if (!req.cookies.user_id) return res.status(401).send('You must be logged in to view this page.');
+  if (!req.session.user_id) return res.status(401).send('You must be logged in to view this page.');
 
-  const user = findUserByID(req.cookies.user_id);
+  const user = findUserByID(req.session.user_id);
   const filteredList = urlsForUser(user.id);
   const templateVars = { urls: filteredList, user };
 
@@ -151,9 +154,9 @@ app.get("/urls.json", (req, res) => {
 //GET new urls page
 app.get("/urls/new", (req, res) => {
   //redirect user if not logged in
-  if (!req.cookies.user_id) return res.redirect(`/login`);
+  if (!req.session.user_id) return res.redirect(`/login`);
 
-  const user = findUserByID(req.cookies.user_id);
+  const user = findUserByID(req.session.user_id);
   const templateVars = { user };
 
   res.render("urls_new", templateVars);
@@ -162,12 +165,12 @@ app.get("/urls/new", (req, res) => {
 //GET EDIT long url page
 app.get('/urls/:shortURL', (req, res) => {
   //send 401 status if not logged in
-  if (!req.cookies.user_id) return res.status(401).send('You must be logged in to view this page.');
+  if (!req.session.user_id) return res.status(401).send('You must be logged in to view this page.');
 
   //send 401 status if not rightful owner
-  if (urlDatabase[req.params.shortURL].userID !== req.cookies.user_id) return res.status(401).send('This URL does not belong to you.');
+  if (urlDatabase[req.params.shortURL].userID !== req.session.user_id) return res.status(401).send('This URL does not belong to you.');
 
-  const user = findUserByID(req.cookies.user_id);
+  const user = findUserByID(req.session.user_id);
   const shortURL = req.params.shortURL;
   const longURL = urlDatabase[shortURL].longURL;
   const templateVars = { longURL, shortURL, user };
@@ -205,7 +208,7 @@ app.post('/register', (req, res) => {
   users[id] = { id, email, password: hashedPassword };
 
   //store cookie for new user
-  res.cookie('user_id', id);
+  req.session.user_id = id;
   res.redirect('/urls');
 });
 
@@ -229,24 +232,23 @@ app.post('/login', (req, res) => {
   const id = getUserByEmail(email);
 
   //set cookie for user id
-  res.cookie('user_id', id);
+  req.session.user_id = id;
   res.redirect('/urls');
 });
 
 //LOGOUT POST
 app.post('/logout', (req, res) => {
-  res.clearCookie('user_id');
+  req.session = null;
   res.redirect('/login');
 });
 
 //ADD POST new urls & redirect
 app.post('/urls', (req, res) => {
-
   //Don't allow create new URL through curl
   //curl -X POST -d "longURL=http://www.lighthouselabs.com" localhost:8080/urls
-  if (!req.cookies.user_id) return res.status(401).send('You must be logged in to create a new URL.\n');
+  if (!req.session.user_id) return res.status(401).send('You must be logged in to create a new URL.\n');
 
-  const userID = req.cookies.user_id;
+  const userID = req.session.user_id;
   const shortURL = generateRandomString();
   const longURL = req.body.longURL;
 
@@ -257,8 +259,8 @@ app.post('/urls', (req, res) => {
 //EDIT POST long URL
 app.post('/urls/:shortURL', (req, res) => {
   //Don't allow editing through curl
-  //curl - X POST - i - d "longURL=http://google.ca/" localhost: 8080/urls/b6UTxQ
-  if (!req.cookies.user_id) return res.status(401).send('You must be logged in to edit a URL.\n');
+  //curl -X POST -i -d "longURL=http://google.ca/" localhost:8080/urls/b6UTxQ
+  if (!req.session.user_id) return res.status(401).send('You must be logged in to edit a URL.\n');
 
   const shortURL = req.params.shortURL;
   const longURL = req.body.longURL;
@@ -267,11 +269,11 @@ app.post('/urls/:shortURL', (req, res) => {
   res.redirect('/urls');
 });
 
-//DELETE POST urlS
+//DELETE POST urls
 app.post('/urls/:shortURL/delete', (req, res) => {
   //don't allow delete url through curl
-  //curl -X POST -i localhost:8080/urls/sgq3y6/delete
-  if (!req.cookies.user_id) return res.status(401).send('You must be logged in to delete a URL.\n');
+  //curl -X POST -i localhost:8080/urls/b6UTxQ/delete
+  if (!req.session.user_id) return res.status(401).send('You must be logged in to delete a URL.\n');
 
   const shortURL = req.params.shortURL;
   delete urlDatabase[shortURL];
