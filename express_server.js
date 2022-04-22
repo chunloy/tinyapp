@@ -1,15 +1,17 @@
 /* eslint-disable camelcase */
-const { generateRandomString, findUserByID, getUserByEmail, checkUserEmail, getPasswordByEmail, urlsForUser } = require('./helpers');
+const { generateRandomString, findUserByID, getUserByEmail, checkUserEmail, getPasswordByEmail, urlsForUser, lookupShortURL } = require('./helpers');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
+const morgan = require('morgan');
 
 const app = express();
 const PORT = 8080;
 
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(morgan('dev'));
 app.use(cookieSession({
   name: 'session',
   keys: ['thisistopsecretdonotshare']
@@ -43,23 +45,36 @@ const users = {
 
 //-------------------- GET REQUESTS --------------------
 
+//GET root page
+app.get('/', (req, res) => {
+  //redirect to urls page if logged in
+  if (req.session.user_id) return res.redirect(`/urls`);
+
+  //if not logged in, redirect to login
+  if (!req.session.user_id) return res.redirect(`/login`);
+});
+
 //GET register page
 app.get('/register', (req, res) => {
+  //redirect to urls page if logged in
+  if (req.session.user_id) return res.redirect(`/urls`);
   res.render("urls_register", { user: undefined });
 });
 
 //GET login page
 app.get('/login', (req, res) => {
+  //redirect to urls page if logged in
+  if (req.session.user_id) return res.redirect(`/urls`);
   const user = req.session.user_id;
   const templateVars = { user };
 
   res.render("urls_login", templateVars);
 });
 
-//GET urls (main page)
+//GET urls (main login page)
 app.get('/urls', (req, res) => {
   //send 401 status if user is not logged in
-  if (!req.session.user_id) return res.status(401).send('You must be logged in to view this page.');
+  if (!req.session.user_id) return res.status(401).send('You must be logged in view your URLs.');
 
   const user = findUserByID(req.session.user_id, users);
   const filteredList = urlsForUser(user.id, urlDatabase);
@@ -76,7 +91,7 @@ app.get("/urls.json", (req, res) => {
 //GET new urls page
 app.get("/urls/new", (req, res) => {
   //redirect user if not logged in
-  if (!req.session.user_id) return res.redirect(`/login`);
+  if (!req.session.user_id) return res.redirect('/login');
 
   const user = findUserByID(req.session.user_id, users);
   const templateVars = { user };
@@ -102,9 +117,11 @@ app.get('/urls/:shortURL', (req, res) => {
 
 //GET long url from short url (public)
 app.get("/u/:shortURL", (req, res) => {
+  //Send 404 status if short url not in database
+  if (!lookupShortURL(req.params.shortURL, urlDatabase)) return res.status(404).send('Page Not Found.');
+
   const shortURL = req.params.shortURL;
   const longURL = urlDatabase[shortURL].longURL;
-
   res.redirect(longURL);
 });
 
@@ -116,7 +133,7 @@ app.post('/register', (req, res) => {
   const password = req.body.password;
 
   //send 400 status if email/password are empty
-  if (!email || !password) return res.status(400).send('Login credentials cannot be empty! Try again.');
+  if (!email || !password) return res.status(400).send('Login credentials cannot be empty! Please try again.');
 
   //send 400 status if email exists in users database
   if (checkUserEmail(email, users)) return res.status(400).send('This email already exists! Please login instead.');
@@ -139,15 +156,13 @@ app.post('/login', (req, res) => {
   const password = req.body.password;
 
   //send 400 status if email/password are empty
-  if (!email || !password) return res.status(400).send('Login credentials cannot be empty! Try again');
+  if (!email || !password) return res.status(400).send('Login credentials cannot be empty! Please try again');
 
   //send 403 status if email doesn't exist in users database
   if (!checkUserEmail(email, users)) return res.status(403).send('Email doesn\'t exists! Please register instead.');
 
   //send 403 status if hashed password doesn't match
-  if (!bcrypt.compareSync(password, getPasswordByEmail(email, users))) {
-    return res.status(403).send('Wrong password! Try again.');
-  }
+  if (!bcrypt.compareSync(password, getPasswordByEmail(email, users))) return res.status(403).send('Invalid credentials. Please try again.');
 
   //find user id in users database
   const id = getUserByEmail(email, users);
@@ -160,7 +175,7 @@ app.post('/login', (req, res) => {
 //LOGOUT POST
 app.post('/logout', (req, res) => {
   req.session = null;
-  res.redirect('/login');
+  res.redirect('/urls');
 });
 
 //ADD POST new urls & redirect
@@ -182,6 +197,8 @@ app.post('/urls/:shortURL', (req, res) => {
   //Don't allow editing through curl
   //curl -X POST -i -d "longURL=http://google.ca/" localhost:8080/urls/b6UTxQ
   if (!req.session.user_id) return res.status(401).send('You must be logged in to edit a URL.\n');
+  //send 401 if not the owner of the url
+  if (req.session.user_id !== urlDatabase[req.params.shortURL].userID) return res.status(401).send('You must be logged in as the owner to edit this URL.\n');
 
   const shortURL = req.params.shortURL;
   const longURL = req.body.longURL;
@@ -194,7 +211,11 @@ app.post('/urls/:shortURL', (req, res) => {
 app.post('/urls/:shortURL/delete', (req, res) => {
   //don't allow delete url through curl
   //curl -X POST -i localhost:8080/urls/b6UTxQ/delete
+
+  //send 401 if not logged in
   if (!req.session.user_id) return res.status(401).send('You must be logged in to delete a URL.\n');
+  //send 401 if not the owner of the url
+  if (req.session.user_id !== urlDatabase[req.params.shortURL].userID) return res.status(401).send('You must be logged in as the owner to delete this URL.\n');
 
   const shortURL = req.params.shortURL;
   delete urlDatabase[shortURL];

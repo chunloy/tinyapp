@@ -76,4 +76,13 @@ const urlsForUser = function(userID, database) {
   return filteredList;
 };
 
-module.exports = { generateRandomString, findUserByID, getUserByEmail, checkUserEmail, getPasswordByEmail, urlsForUser };
+const lookupShortURL = function(shortURL, database) {
+  const shortURLs = Object.keys(database);
+
+  for (const url of shortURLs) {
+    if (shortURL === url) return true;
+  }
+  return false;
+};
+
+module.exports = { generateRandomString, findUserByID, getUserByEmail, checkUserEmail, getPasswordByEmail, urlsForUser, lookupShortURL };

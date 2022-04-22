@@ -1,5 +1,5 @@
 const { assert } = require('chai');
-const { findUserByID, getUserByEmail, checkUserEmail, getPasswordByEmail, urlsForUser } = require('../helpers');
+const { findUserByID, getUserByEmail, checkUserEmail, getPasswordByEmail, urlsForUser, lookupShortURL } = require('../helpers');
 
 const testUsers = {
   "userRandomID": {
@@ -101,5 +101,19 @@ describe('#urlsForUser', () => {
     const urlPair = urlsForUser('user3RandomID', testUrlDatabase);
 
     assert.deepEqual(urlPair, {});
+  });
+});
+
+describe('#lookupShortURL', () => {
+  it('should return true if url was found', () => {
+    const url = lookupShortURL('b6UTxQ', testUrlDatabase);
+
+    assert.strictEqual(url, true);
+  });
+
+  it('should return false if url was not found', () => {
+    const url = lookupShortURL('fyd72j', testUrlDatabase);
+
+    assert.deepEqual(url, false);
   });
 });
