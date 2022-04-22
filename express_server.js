@@ -65,6 +65,7 @@ app.get('/register', (req, res) => {
 app.get('/login', (req, res) => {
   //redirect to urls page if logged in
   if (req.session.user_id) return res.redirect(`/urls`);
+
   const user = req.session.user_id;
   const templateVars = { user };
 
@@ -122,6 +123,7 @@ app.get("/u/:shortURL", (req, res) => {
 
   const shortURL = req.params.shortURL;
   const longURL = urlDatabase[shortURL].longURL;
+
   res.redirect(longURL);
 });
 
@@ -180,8 +182,7 @@ app.post('/logout', (req, res) => {
 
 //ADD POST new urls & redirect
 app.post('/urls', (req, res) => {
-  //Don't allow create new URL through curl
-  //curl -X POST -d "longURL=http://www.lighthouselabs.com" localhost:8080/urls
+  //Send 401 if not logged in
   if (!req.session.user_id) return res.status(401).send('You must be logged in to create a new URL.\n');
 
   const userID = req.session.user_id;
@@ -189,29 +190,26 @@ app.post('/urls', (req, res) => {
   const longURL = req.body.longURL;
 
   urlDatabase[shortURL] = { longURL, userID };
+
   res.redirect(`/urls/${shortURL}`); //add url pair to database
 });
 
 //EDIT POST long URL
 app.post('/urls/:shortURL', (req, res) => {
-  //Don't allow editing through curl
-  //curl -X POST -i -d "longURL=http://google.ca/" localhost:8080/urls/b6UTxQ
+  //Send 401 if not logged in
   if (!req.session.user_id) return res.status(401).send('You must be logged in to edit a URL.\n');
   //send 401 if not the owner of the url
   if (req.session.user_id !== urlDatabase[req.params.shortURL].userID) return res.status(401).send('You must be logged in as the owner to edit this URL.\n');
 
   const shortURL = req.params.shortURL;
   const longURL = req.body.longURL;
-
   urlDatabase[shortURL].longURL = longURL;
+
   res.redirect('/urls');
 });
 
 //DELETE POST urls
 app.post('/urls/:shortURL/delete', (req, res) => {
-  //don't allow delete url through curl
-  //curl -X POST -i localhost:8080/urls/b6UTxQ/delete
-
   //send 401 if not logged in
   if (!req.session.user_id) return res.status(401).send('You must be logged in to delete a URL.\n');
   //send 401 if not the owner of the url
@@ -219,6 +217,7 @@ app.post('/urls/:shortURL/delete', (req, res) => {
 
   const shortURL = req.params.shortURL;
   delete urlDatabase[shortURL];
+
   res.redirect('/urls');
 });
 
